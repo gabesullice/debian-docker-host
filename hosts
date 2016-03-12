@@ -1,0 +1,13 @@
+[debian-jessie]
+104.131.99.138
+45.55.50.5
+
+[production]
+104.131.99.138
+45.55.50.5
+
+[production:vars]
+etcd_discovery_url="https://discovery.etcd.io/b4922e15f334418dd211f1dd2d728176"
+
+[docker-hosts:children]
+production

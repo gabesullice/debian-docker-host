@@ -1,0 +1,103 @@
+---
+
+- name: create writable /opt/etcd directory
+  file:
+    dest: /opt/etcd
+    owner: root
+    group: root
+    mode: 0755
+    state: directory
+  tags:
+    - filesystem
+
+- name: fetch the latest version of etcd
+  get_url:
+    url: https://github.com/coreos/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-amd64.tar.gz
+    dest: /opt/etcd/etcd-{{ etcd_version }}-linux-amd64.tar.gz
+  tags:
+    - update
+
+- name: unarchive etcd
+  unarchive:
+    src: /opt/etcd/etcd-{{ etcd_version }}-linux-amd64.tar.gz
+    dest: /opt/etcd
+    owner: root
+    group: root
+    mode: 0755
+    copy: no
+    creates: /opt/etcd/etcd-{{ etcd_version }}-linux-amd64
+  tags:
+    - update
+
+- name: create executable etcd command symlinks
+  file:
+    src: /opt/etcd/etcd-{{ etcd_version }}-linux-amd64/{{ item }}
+    dest: /usr/bin/{{ item }}
+    state: link
+    owner: root
+    group: root
+    mode: 0754
+    force: yes
+  with_items:
+    - etcd
+    - etcdctl
+  tags:
+    - update
+
+- name: create etcd system user
+  user:
+    name: etcd
+    createhome: no
+    system: yes
+    state: present
+  tags:
+    - user
+
+- name: create /var/lib/etcd directory
+  file:
+    dest: /var/lib/etcd
+    owner: etcd
+    group: root
+    mode: 0755
+    state: directory
+  tags:
+    - filesystem
+
+- name: create etcd systemd unit
+  copy:
+    src: etcd.service
+    dest: "/etc/systemd/system/etcd.service"
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+    - systemd
+
+- name: create systemd drop-in directory for etcd
+  file:
+    dest: /etc/systemd/system/etcd.service.d
+    owner: root
+    group: root
+    mode: 0755
+    state: directory
+  tags:
+    - filesystem
+    - systemd
+
+- name: create systemd drop-in file for etcd to start initial cluster
+  template:
+    src: etcd.environment.j2
+    dest: /etc/systemd/system/etcd.service.d/10-environment.conf
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+    - systemd
+
+- name: enable and start the etcd systemd unit
+  service:
+    name: etcd.service
+    enabled: yes
+    state: started
+  tags:
+    - systemd
