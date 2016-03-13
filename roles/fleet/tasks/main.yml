@@ -1,0 +1,125 @@
+---
+
+- name: create writable /opt/fleetd directory
+  file:
+    dest: /opt/fleetd
+    owner: root
+    group: root
+    mode: 0755
+    state: directory
+  tags:
+    - filesystem
+
+- name: fetch the latest version of fleet
+  get_url:
+    url: https://github.com/coreos/fleet/releases/download/{{ fleet_version }}/fleet-{{ fleet_version }}-linux-amd64.tar.gz
+    dest: /opt/fleetd/fleet-{{ fleet_version }}-linux-amd64.tar.gz
+  tags:
+    - update
+
+- name: unarchive fleet
+  unarchive:
+    src: /opt/fleetd/fleet-{{ fleet_version }}-linux-amd64.tar.gz
+    dest: /opt/fleetd
+    owner: root
+    group: root
+    mode: 0755
+    copy: no
+    creates: /opt/fleetd/fleet-{{ fleet_version }}-linux-amd64
+  tags:
+    - update
+
+- name: create executable fleet command symlinks
+  file:
+    src: /opt/fleetd/fleet-{{ fleet_version }}-linux-amd64/{{ item }}
+    dest: /usr/bin/{{ item }}
+    state: link
+    owner: root
+    group: root
+    mode: 0754
+    force: yes
+  with_items:
+    - fleetd
+    - fleetctl
+  tags:
+    - update
+
+- name: create fleetd system user
+  user:
+    name: fleetd
+    createhome: no
+    system: yes
+    state: present
+  tags:
+    - user
+
+- name: create /run/fleet directory
+  file:
+    dest: /run/fleet
+    owner: fleetd
+    group: root
+    mode: 0755
+    state: directory
+  tags:
+    - filesystem
+
+- name: create fleetd systemd unit
+  copy:
+    src: fleet.service
+    dest: "/etc/systemd/system/fleet.service"
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - reload systemd
+  tags:
+    - systemd
+
+- name: create fleetd systemd socket unit
+  copy:
+    src: fleet.socket
+    dest: "/etc/systemd/system/fleet.socket"
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - reload systemd
+  tags:
+    - systemd
+
+#- name: create systemd drop-in directory for etcd
+#  file:
+#    dest: /etc/systemd/system/etcd.service.d
+#    owner: root
+#    group: root
+#    mode: 0755
+#    state: directory
+#  tags:
+#    - filesystem
+#    - systemd
+#
+#- name: create systemd drop-in file for etcd to start initial cluster
+#  template:
+#    src: etcd.environment.j2
+#    dest: /etc/systemd/system/etcd.service.d/10-environment.conf
+#    owner: root
+#    group: root
+#    mode: 0644
+#  tags:
+#    - systemd
+
+- name: enable and start the fleetd systemd socket unit
+  service:
+    name: fleet.socket
+    enabled: yes
+    state: started
+  tags:
+    - systemd
+
+- name: enable and start the fleetd systemd unit
+  service:
+    name: fleet.service
+    enabled: yes
+    state: started
+  tags:
+    - systemd

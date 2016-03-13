@@ -2,3 +2,4 @@
 
 - include: docker.yml
 - include: etcd.yml
+- include: fleet.yml
